@@ -17,12 +17,14 @@ class Computer:
         }
         self.pointer = 0
         self.base = 0
+        self.iteration = 0
         self.stopped = False
         self.waiting = False
 
     def run(self):
         self.waiting = False
         while not self.stopped and not self.waiting:
+            self.iteration += 1
             op_code_and_params = self.memory[self.pointer]
             self.pointer += 1
 
@@ -30,13 +32,18 @@ class Computer:
             func, arg_num = self.func_and_arg_num[op_code]
             params = self.decode_params(params_code, arg_num)
 
-            args = [
-                self.pointer + i
-                if params[i] == 1
-                else self.memory[self.pointer + i]
-                + (self.base if params[i] == 2 else 0)
-                for i in range(arg_num)
-            ]
+            args = []
+            for i in range(arg_num):
+                if params[i] == 0:  # position mode
+                    a = self.memory[self.pointer + i]
+                elif params[i] == 1:  # immediate mode
+                    a = self.pointer + i
+                elif params[i] == 2:  # relative mode
+                    a = self.memory[self.pointer + i] + self.base
+                else:
+                    raise ValueError(f"unexpected param mode {params[i]}")
+                args.append(a)
+
             func(*args)
             self.pointer += arg_num
 
@@ -67,11 +74,11 @@ class Computer:
 
     def f_jump_true(self, condition, address):
         if self.memory[condition]:
-            self.pointer = self.memory[address]
+            self.pointer = self.memory[address] - 2
 
     def f_jump_false(self, condition, address):
         if not self.memory[condition]:
-            self.pointer = self.memory[address]
+            self.pointer = self.memory[address] - 2
 
     def f_less(self, a, b, res):
         self.memory[res] = int(self.memory[a] < self.memory[b])
@@ -88,12 +95,13 @@ class Computer:
 
 if __name__ == "__main__":
     import sys
-    import itertools as it
 
     text = sys.stdin.read()
     memory = [*map(int, text.split(","))]
 
     computer = Computer(memory, [])
+    if len(sys.argv) > 1:
+        computer.input.append(int(sys.argv[1]))
     computer.run()
 
     print(f"{computer.output}")
