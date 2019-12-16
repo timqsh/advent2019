@@ -1,91 +1,78 @@
-from typing import NamedTuple, Tuple, List, Callable
-from math import gcd
+from typing import NamedTuple, Tuple, List
+import math
 
 
 class Pos(NamedTuple):
     x: int
     y: int
 
-    def __add__(self, other: "Pos"):  # type: ignore
+    def __add__(self, other: "Pos") -> "Pos":  # type: ignore
         return self.__class__(self.x + other.x, self.y + other.y)
 
-    def __sub__(self, other: "Pos"):
+    def __sub__(self, other: "Pos") -> "Pos":
         return self.__class__(self.x - other.x, self.y - other.y)
 
-    def __mul__(self, other: int):
+    def __mul__(self, other: int) -> "Pos":
         return self.__class__(self.x * other, self.y * other)
 
-    def __floordiv__(self, other: int):
+    def __floordiv__(self, other: int) -> "Pos":
         return self.__class__(self.x // other, self.y // other)
+
+    def clockwise_around(self, p: "Pos") -> float:
+        return -math.atan2(p.x - self.x, p.y - self.y)
 
 
 class Grid(list):
     def __init__(self, li: List[List[str]]):
         self.width = len(li[0])
         self.height = len(li)
-        return super().__init__(li)
+        super().__init__(li)
 
-    def pos(self, pos: Pos) -> str:
-        return self[pos.y][pos.x]
+    def __getitem__(self, key):
+        if isinstance(key, Pos):
+            return self[key.y][key.x]
+        else:
+            return super().__getitem__(key)
 
-    def set_pos(self, pos: Pos, value: str) -> None:
-        self[pos.y][pos.x] = value
+    def __setitem__(self, key, value):
+        if isinstance(key, Pos):
+            self[key.y][key.x] = value
+        else:
+            super().__setitem__(key, value)
+
+    def positions(self) -> List[Pos]:
+        return [Pos(x, y) for x in range(self.width) for y in range(self.height)]
+
+    def is_asteroid(self, pos: Pos) -> bool:
+        return self[pos] == "#"
 
     def asteroids(self) -> List[Pos]:
-        res = []
-        for x in range(self.width):
-            for y in range(self.height):
-                p = Pos(x, y)
-                if self.pos(p) == "#":
-                    res.append(p)
-        return res
+        return [*filter(self.is_asteroid, self.positions())]
 
     def is_visible(self, p1: Pos, p2: Pos) -> bool:
-        dx = p2.x - p1.x
-        dy = p2.y - p1.y
+        delta = p2 - p1
+        divisor = math.gcd(delta.x, delta.y)
+        step = delta // divisor
 
-        div = gcd(dx, dy)
-        step = Pos(dx, dy) // div
-
-        for i in range(1, div):
-            pos = p1 + (step * i)
-            if self.pos(pos) == "#":
+        for i in range(1, divisor):
+            blocking_pos = p1 + (step * i)
+            if self.is_asteroid(blocking_pos):
                 return False
         return True
 
-    def visible_from(self, pos: Pos) -> List[Pos]:
-        res = []
-        for a in self.asteroids():
-            if a != pos and self.is_visible(pos, a):
-                res.append(a)
-        return res
+    def asteroids_visible_from(self, pos: Pos) -> List[Pos]:
+        return [a for a in self.asteroids() if a != pos and self.is_visible(pos, a)]
 
     def best_pos(self) -> Tuple[Pos, int]:
         cur_max = 0
-        cur_pos: Pos
+        cur_pos = None
         for a in self.asteroids():
-            n = len(self.visible_from(a))
+            n = len(self.asteroids_visible_from(a))
             if n > cur_max:
                 cur_max = n
                 cur_pos = a
+        assert cur_pos is not None, "no asteroid found :("
         return cur_pos, cur_max
-
-
-def clockwise_around(center: Pos) -> Callable:
-    def clockwise_order(p: Pos) -> Tuple[int, float]:
-        dy, dx = (p.y - center.y), (p.x - center.x)
-        if dx == 0 and dy < 0:  # 12 o'clock
-            return 1, 0
-        elif dx > 0:
-            return 2, dy / dx
-        elif dx == 0 and dy > 0:  # 6 o'clock
-            return 3, 0
-        elif dx < 0:
-            return 4, dy / dx
-        else:
-            raise ValueError("sorting error")
-
-    return clockwise_order
 
 
 if __name__ == "__main__":
@@ -99,13 +86,12 @@ if __name__ == "__main__":
 
     i = 0
     while True:
-        asteroids = grid.visible_from(best_pos)
+        asteroids = grid.asteroids_visible_from(best_pos)
         if not asteroids:
             break
-
-        asteroids.sort(key=clockwise_around(best_pos))
+        asteroids.sort(key=best_pos.clockwise_around)
         for asteroid in asteroids:
             i += 1
-            grid.set_pos(asteroid, ".")
+            grid[asteroid] = "."
             if i == 200:
                 print(f"{i}: {asteroid}")
