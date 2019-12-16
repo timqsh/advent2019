@@ -11,9 +11,8 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "1",
                 "<",
-                "d9/in"
+                "d10/in2"
             ]
         }
     ]
