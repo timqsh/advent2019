@@ -1,5 +1,5 @@
-from typing import NamedTuple, List
-import math
+from typing import List
+import itertools as it
 
 
 class Computer:
@@ -107,9 +107,48 @@ class Computer:
         self.stopped = True
 
 
+class Game:
+    WIDTH = 50
+    HEIGHT = 50
+
+    EMPTY = 0
+    WALL = 1
+    BLOCK = 2
+    PADDLE = 3
+    BALL = 4
+
+    def __init__(self, display_data):
+        self.grid = [[0] * 50 for _ in range(50)]
+        objects = [
+            display_data[i * 3 : i * 3 + 3] for i in range(len(display_data) // 3)
+        ]
+        for o in objects:
+            if o[0] == -1 and o[1] == 0:
+                self.score = o[2]
+            if o[2] == self.PADDLE:
+                self.paddle_pos = o[0], o[1]
+            if o[2] == self.BALL:
+                self.ball_pos = o[0], o[1]
+
+            self.grid[o[0]][o[1]] = o[2]
+
+    def __repr__(self):
+        return "\n".join("".join(map(str, line)) for line in self.grid)
+
+    def number_of_blocks(self):
+        return len([o for o in it.chain(*self.grid) if o == 2])
+
+    def get_output(self):
+        if self.ball_pos[0] == self.paddle_pos[0]:
+            return 0
+        elif self.ball_pos[0] > self.paddle_pos[0]:
+            return 1
+        elif self.ball_pos[0] < self.paddle_pos[0]:
+            return -1
+
+
 if __name__ == "__main__":
     import sys
-    import itertools as it
 
     text = sys.stdin.read()
     memory = [*map(int, text.split(","))]
@@ -117,15 +156,14 @@ if __name__ == "__main__":
     computer = Computer(memory)
     if len(sys.argv) > 1:
         computer.input.append(int(sys.argv[1]))
-    computer.memory[0] == 2  # free mode
+    computer.memory[0] = 2  # free mode
 
-    grid = [[0] * 100 for _ in range(100)]
-    computer.run()
-    objects = [
-        computer.output[i * 3 : i * 3 + 3] for i in range(len(computer.output) // 3)
-    ]
-    for o in objects:
-        grid[o[0]][o[1]] = o[2]
+    i = 0
+    while not computer.stopped:
+        i += 1
+        computer.run()
+        game = Game(computer.output)
+        command = game.get_output()
+        computer.input.append(command)
 
-    print(*["".join(map(str, line)) for line in grid], sep="\n")
-    print(f"{len([o for o in it.chain(*grid) if o==2])}")
+    print(f"{i} turns, {game.grid[-1][0]} score")
